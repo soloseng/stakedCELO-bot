@@ -34,10 +34,10 @@ export async function withdraw(kit: any, beneficiaryAddress: string) {
         const immediateWithdrawalAmount = await accountContract.methods
           .scheduledVotesForGroup(group)
           .call();
-        console.log("immediateWithdrawalAmount:", immediateWithdrawalAmount);
+        console.log("DEBUG: immediateWithdrawalAmount:", immediateWithdrawalAmount);
 
         const revokeAmount = scheduledWithdrawalAmount - immediateWithdrawalAmount;
-        console.log("revokeAmount:", revokeAmount);
+        console.log("DEBUG: revokeAmount:", revokeAmount);
 
         // get AccountContract pending votes for group.
         const groupVote = await electionWrapper.getVotesForGroupByAccount(
@@ -46,12 +46,12 @@ export async function withdraw(kit: any, beneficiaryAddress: string) {
         );
         const pendingVotes = groupVote.pending;
 
-        console.log("pendingVotes:", pendingVotes);
+        console.log("DEBUG: pendingVotes:", pendingVotes);
 
         // amount to revoke from pending
         const toRevokeFromPending = Math.min(revokeAmount, pendingVotes.toNumber());
 
-        console.log("toRevokeFromPending:", toRevokeFromPending);
+        console.log("DEBUG: toRevokeFromPending:", toRevokeFromPending);
 
         // find lesser and greater for pending votes
         // @ts-ignore
@@ -66,7 +66,7 @@ export async function withdraw(kit: any, beneficiaryAddress: string) {
         // find amount to revoke from active votes
         const toRevokeFromActive = revokeAmount - toRevokeFromPending;
 
-        console.log("toRevokeFromActive:", toRevokeFromActive);
+        console.log("DEBUG: toRevokeFromActive:", toRevokeFromActive);
 
         // find lesser and greater for active votes
         // @ts-ignore
@@ -85,14 +85,14 @@ export async function withdraw(kit: any, beneficiaryAddress: string) {
           accountContract.options.address
         );
 
-        console.log("Finalizing:");
-        console.log("beneficiaryAddress:", beneficiaryAddress);
-        console.log("group:", group);
-        console.log("lesserAfterPendingRevoke:", lesserAfterPendingRevoke);
-        console.log("greaterAfterPendingRevoke:", greaterAfterPendingRevoke);
-        console.log("lesserAfterActiveRevoke:", lesserAfterActiveRevoke);
-        console.log("greaterAfterActiveRevoke:", greaterAfterActiveRevoke);
-        console.log("index:", index);
+        console.log("DEBUG: Finalizing:");
+        console.log("DEBUG: beneficiaryAddress:", beneficiaryAddress);
+        console.log("DEBUG: group:", group);
+        console.log("DEBUG: lesserAfterPendingRevoke:", lesserAfterPendingRevoke);
+        console.log("DEBUG: greaterAfterPendingRevoke:", greaterAfterPendingRevoke);
+        console.log("DEBUG: lesserAfterActiveRevoke:", lesserAfterActiveRevoke);
+        console.log("DEBUG: greaterAfterActiveRevoke:", greaterAfterActiveRevoke);
+        console.log("DEBUG: index:", index);
 
         const signerAddress = addKitAccount(kit);
 
@@ -109,40 +109,43 @@ export async function withdraw(kit: any, beneficiaryAddress: string) {
         const tx = await kit.sendTransactionObject(txObject, { from: signerAddress });
 
         const receipt = await tx.waitReceipt();
-        console.log(receipt.status);
+
         const unlockEvent: any = Object.values(receipt.events).filter((section: any) => {
           return section.address == ALFAJORES_LOCKED_GOLD_CONTRACT_ADDRESS;
         });
+        console.log("DEBUG: eventz:", receipt.events);
+        console.log("DEBUG: unlockEvent:", unlockEvent, unlockEvent.length);
+        if (unlockEvent !== undefined && unlockEvent.length > 0) {
+          const decodedLogs = kit.web3.eth.abi.decodeLog(
+            [
+              {
+                indexed: true,
+                name: "account",
+                type: "address",
+              },
+              {
+                indexed: false,
+                name: "value",
+                type: "uint256",
+              },
+              {
+                indexed: false,
+                name: "available",
+                type: "uint256",
+              },
+            ],
+            unlockEvent[0]["raw"]["data"],
+            [unlockEvent[0]["raw"]["topics"][1]]
+          );
 
-        const decodedLogs = kit.web3.eth.abi.decodeLog(
-          [
-            {
-              indexed: true,
-              name: "account",
-              type: "address",
-            },
-            {
-              indexed: false,
-              name: "value",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              name: "available",
-              type: "uint256",
-            },
-          ],
-          unlockEvent[0]["raw"]["data"],
-          [unlockEvent[0]["raw"]["topics"][1]]
-        );
-
-        // add to db
-        await addPendingWithdrawal(
-          beneficiaryAddress,
-          decodedLogs.value,
-          decodedLogs.available,
-          group
-        );
+          // add to db
+          await addPendingWithdrawal(
+            beneficiaryAddress,
+            decodedLogs.value,
+            decodedLogs.available,
+            group
+          );
+        }
       }
     }
   } catch (error) {
@@ -160,6 +163,6 @@ async function findAddressIndex(
     const list = await electionWrapper.getGroupsVotedForByAccount(account);
     return list.indexOf(group);
   } catch (error) {
-    throw new Error("Failed to find group index");
+    throw error;
   }
 }

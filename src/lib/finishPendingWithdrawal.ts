@@ -23,9 +23,9 @@ export async function finishPendingWithdrawals(kit: any, beneficiaryAddress: str
         beneficiaryAddress
       );
 
-      console.log(`beneficiary: ${beneficiaryAddress}`);
-      console.log(`localPendingWithdrawalIndex: ${localIndex}`);
-      console.log(`lockedGoldPendingWithdrawalIndex: ${lockedGoldIndex}`);
+      console.log(`DEBUG: beneficiary: ${beneficiaryAddress}`);
+      console.log(`DEBUG: localPendingWithdrawalIndex: ${localIndex}`);
+      console.log(`DEBUG: lockedGoldPendingWithdrawalIndex: ${lockedGoldIndex}`);
 
       const signerAddress = addKitAccount(kit);
 
@@ -43,7 +43,7 @@ export async function finishPendingWithdrawals(kit: any, beneficiaryAddress: str
       }
     }
   } catch (error) {
-    throw error;
+    throw new Error(`Failed to finish pending withdrawal: ${error}`);
   }
 }
 
@@ -70,7 +70,7 @@ async function getPendingWithdrawalIndexes(
     );
 
     if (localPendingWithdrawals[0].length != localPendingWithdrawals[1].length) {
-      throw new Error("mismatched list");
+      throw new Error("Mismatched list length.");
     }
 
     const localTimestampList: [] = localPendingWithdrawals[1];

@@ -11,6 +11,17 @@ import { closeKitConnection, createKit } from "./kit-helpers";
 import { finishPendingWithdrawals } from "../lib/finishPendingWithdrawal";
 import { addPendingWithdrawal, compareTimestamp, createDatabase } from "./db-helpers";
 
+export async function subscribeToEvents(web3: any) {
+  try {
+    await createDatabase();
+    newBlockEventSubscription(web3);
+    stakedCeloBurnEventSubscription(web3);
+    // goldUnlockedEventSubscription(web3);
+  } catch (error) {
+    console.log("Failed to subscribe to events:", error);
+  }
+}
+
 /// listen for stCELO burn events.
 // When an event is emmited, start the withdrawal process using `Account.withdraw`.
 // Once we receive receipt of the transaction, use the event logs to store data to the db.
@@ -31,29 +42,33 @@ function stakedCeloBurnEventSubscription(web3: any) {
   );
 
   burnEventSubscription.on("data", async (burnEvent: any) => {
-    const decodedLogs = web3.eth.abi.decodeLog(
-      [
-        {
-          indexed: true,
-          name: "from",
-          type: "address",
-        },
-        {
-          indexed: true,
-          name: "to",
-          type: "address",
-        },
-        {
-          indexed: false,
-          name: "value",
-          type: "uint256",
-        },
-      ],
-      burnEvent["data"],
-      [burnEvent["topics"][1], burnEvent["topics"][2]]
-    );
+    try {
+      const decodedLogs = web3.eth.abi.decodeLog(
+        [
+          {
+            indexed: true,
+            name: "from",
+            type: "address",
+          },
+          {
+            indexed: true,
+            name: "to",
+            type: "address",
+          },
+          {
+            indexed: false,
+            name: "value",
+            type: "uint256",
+          },
+        ],
+        burnEvent["data"],
+        [burnEvent["topics"][1], burnEvent["topics"][2]]
+      );
 
-    withdrawFromAccountOnBurnEvent(decodedLogs);
+      withdrawFromAccountOnBurnEvent(decodedLogs);
+    } catch (error) {
+      console.log("Failed to run task on stCELO burn event:", error);
+    }
   });
 
   burnEventSubscription.on("error", (err: any) => {
@@ -100,7 +115,7 @@ function goldUnlockedEventSubscription(web3: any) {
       [data["topics"][1]]
     );
 
-    console.log("timestamp", decodedLogs.available);
+    console.log("DEBUG: timestamp", decodedLogs.available);
 
     // add to db
     await addPendingWithdrawal(
@@ -116,39 +131,32 @@ function goldUnlockedEventSubscription(web3: any) {
 // can use this to periodically check if withdrawal timelock has passed.
 // if passed, finish pending withdrawal for every unique user
 function newBlockEventSubscription(web3: any) {
-  console.log("subscribing to new block events");
+  console.log("DEBUG: subscribing to new block events");
   let headerSubscription = web3.eth.subscribe("newBlockHeaders");
 
   let executionBlock: number = 0;
   headerSubscription.on("data", async function (blockHeader: any) {
-    const lastSeenBlock = blockHeader.number;
-    const lastSeenBlockTimestamp = blockHeader.timestamp;
-    console.log("execution block:", executionBlock);
-    console.log("latest block:", lastSeenBlock);
-    console.log("latest block timestamp:", lastSeenBlockTimestamp);
+    try {
+      const lastSeenBlock = blockHeader.number;
+      const lastSeenBlockTimestamp = blockHeader.timestamp;
+      console.log("DEBUG: execution block:", executionBlock);
+      console.log("DEBUG: latest block:", lastSeenBlock);
+      console.log("DEBUG: latest block timestamp:", lastSeenBlockTimestamp);
 
-    if (executionBlock < lastSeenBlock) {
-      executionBlock = lastSeenBlock + CHECK_INTERVAL;
+      if (executionBlock < lastSeenBlock) {
+        executionBlock = lastSeenBlock + CHECK_INTERVAL;
 
-      console.log("comparing timestamp with db");
-      const beneficiariesList = await compareTimestamp(lastSeenBlockTimestamp);
+        console.log("DEBUG: comparing timestamp with db");
+        const beneficiariesList = await compareTimestamp(lastSeenBlockTimestamp);
 
-      for (var beneficiary of beneficiariesList) {
-        finishPendingWithdrawalOnTimeElapsed(beneficiary["user_address"]);
+        for (var beneficiary of beneficiariesList) {
+          finishPendingWithdrawalOnTimeElapsed(beneficiary["user_address"]);
+        }
       }
+    } catch (error) {
+      console.log("Failed to run task on newBlock Event:", error);
     }
   });
-}
-
-export async function subscribeToEvents(web3: any) {
-  try {
-    await createDatabase();
-    newBlockEventSubscription(web3);
-    stakedCeloBurnEventSubscription(web3);
-    // goldUnlockedEventSubscription(web3);
-  } catch (error) {
-    console.log("Failed to subscribe to events:", error);
-  }
 }
 
 async function withdrawFromAccountOnBurnEvent(decodedLogs: any) {
@@ -159,7 +167,7 @@ async function withdrawFromAccountOnBurnEvent(decodedLogs: any) {
 
     await closeKitConnection(kit);
   } catch (error) {
-    console.log(error);
+    throw error;
   }
 }
 async function finishPendingWithdrawalOnTimeElapsed(beneficiaryAddress: string) {
@@ -170,6 +178,6 @@ async function finishPendingWithdrawalOnTimeElapsed(beneficiaryAddress: string) 
 
     await closeKitConnection(kit);
   } catch (error) {
-    console.log(error);
+    throw error;
   }
 }

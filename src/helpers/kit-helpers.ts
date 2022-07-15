@@ -10,13 +10,7 @@ dotenv.config();
 
 export function setupProvider() {
   let providerOptions = {
-    // timeout: 10 * 1000, // ms
-
     clientConfig: {
-      // Useful if requests are large
-      //   maxReceivedFrameSize: 100000000,   // bytes - default: 1MiB
-      //   maxReceivedMessageSize: 100000000, // bytes - default: 8MiB
-
       // Useful to keep a connection alive
       keepalive: true,
       keepaliveInterval: 30000, // ms
@@ -34,21 +28,21 @@ export function setupProvider() {
   let web3 = new Web3(provider);
 
   provider.on("connect", async (message: any) => {
-    console.log("WebsocketProvider connected", message);
+    console.log("DEBUG: WebsocketProvider connected", message);
   });
   provider.on("close", async (error: any) => {
-    console.log("WebsocketProvider connection closed. Restarting", error);
+    console.log("DEBUG: WebsocketProvider connection closed. Restarting", error);
     // await setupNewProviderAndSubs();
   });
   provider.on("reconnect", async (attempts: any) => {
-    console.log("WebsocketProvider reconnecting", attempts);
+    console.log("DEBUG: WebsocketProvider reconnecting", attempts);
   });
   provider.on("error", async (error: any) => {
-    console.log("WebsocketProvider encountered an error", error);
+    console.log("DEBUG: WebsocketProvider encountered an error", error);
     // await setupNewProviderAndSubs()
   });
   provider.on("end", async () => {
-    console.log("WebsocketProvider has ended, will restart");
+    console.log("DEBUG: WebsocketProvider has ended, will restart");
     // await setupNewProviderAndSubs()
   });
 
@@ -58,9 +52,7 @@ export function setupProvider() {
 export function addKitAccount(kit: ContractKit): string | undefined {
   if (process.env.PRIVATE_KEY !== undefined) {
     kit.connection.addAccount(process.env.PRIVATE_KEY);
-    // kit.web3.eth.account.wallet.add(process.env.PRIVATE_KEY);
     const signerAddress = privateKeyToAddress(process.env.PRIVATE_KEY);
-    // console.log(signerAddress)
     return signerAddress;
   }
   return undefined;
@@ -70,8 +62,12 @@ export function createKit(): ContractKit {
   return newKit(ALFAJORES_HTTP_URL);
 }
 export async function closeKitConnection(kit: ContractKit) {
-  const isListenning = await kit.connection.isListening();
-  if (isListenning) {
-    kit.connection.stop();
+  try {
+    const isListenning = await kit.connection.isListening();
+    if (isListenning) {
+      kit.connection.stop();
+    }
+  } catch (error) {
+    throw new Error(`Failed to close KIT connection: ${error}`);
   }
 }
