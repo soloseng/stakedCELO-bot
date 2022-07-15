@@ -1,0 +1,22 @@
+{
+  "name": "test-event-subscription",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "license": "MIT",
+  "devDependencies": {
+    "@celo/contractkit": "^2.0.0",
+    "chalk": "^5.0.1",
+    "dotenv": "^16.0.1",
+    "prettier": "^2.7.1",
+    "ts-node": "^10.8.2",
+    "typescript": "^4.7.4",
+    "web3": "^1.7.4"
+  },
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "reGo": "ts-node src/reSub.ts"
+  },
+  "dependencies": {
+    "mariadb": "^3.0.0"
+  }
+}
